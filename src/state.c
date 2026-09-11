@@ -359,6 +359,29 @@ int sp_state_admit(SpState *s, const SpChainOracle *o,
     if (!o->owner_now(o->u, name, owner))
         return fail(err, errlen, "name unowned");
 
+    // already-admitted op_id: skip ECDSA on replay (a mesh peer used to
+    // re-dump a captured valid owner op and make us verify it every time)
+    { sqlite3_stmt *st;
+      int have = 0;
+      if (sqlite3_prepare_v2(s->db,
+              "SELECT 1 FROM st_rows WHERE name=? AND op_id=? LIMIT 1",
+              -1, &st, NULL) == SQLITE_OK) {
+          sqlite3_bind_text(st, 1, name, p.name_len, SQLITE_STATIC);
+          sqlite3_bind_blob(st, 2, p.op_id, 32, SQLITE_STATIC);
+          have = sqlite3_step(st) == SQLITE_ROW;
+          sqlite3_finalize(st);
+      }
+      if (!have && sqlite3_prepare_v2(s->db,
+              "SELECT 1 FROM st_names WHERE name=? AND clear_id=? LIMIT 1",
+              -1, &st, NULL) == SQLITE_OK) {
+          sqlite3_bind_text(st, 1, name, p.name_len, SQLITE_STATIC);
+          sqlite3_bind_blob(st, 2, p.op_id, 32, SQLITE_STATIC);
+          have = sqlite3_step(st) == SQLITE_ROW;
+          sqlite3_finalize(st);
+      }
+      if (have) return -1;
+    }
+
     // cheap authority before ECDSA: a hostile mesh peer used to dump 1024 ops
     // signed by *its* key for a live name and make us secp-verify each one
     // before "signer is not the owner". Cert path still needs the verify
