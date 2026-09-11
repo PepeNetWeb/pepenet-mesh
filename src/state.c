@@ -359,8 +359,12 @@ int sp_state_admit(SpState *s, const SpChainOracle *o,
     if (!o->owner_now(o->u, name, owner))
         return fail(err, errlen, "name unowned");
 
-    // signature (low-S over op_id) + authority (owner key, or §2.2 cert with
-    // the overlay's scope bit, minted by the owner, live at this op's anchor)
+    // cheap authority before ECDSA: a hostile mesh peer used to dump 1024 ops
+    // signed by *its* key for a live name and make us secp-verify each one
+    // before "signer is not the owner". Cert path still needs the verify
+    // (the signer is a delegate, not the owner key).
+    if (p.has_cert == SP_CERT_NONE && !sp_key_is_owner(p.signer, 33, owner))
+        return fail(err, errlen, "signer is not the owner");
     if (!low_s(p.sig + 32)) return fail(err, errlen, "high-S signature");
     if (!sp_ecdsa_verify(p.op_id, p.sig, p.signer, 33))
         return fail(err, errlen, "signature invalid");
@@ -368,8 +372,6 @@ int sp_state_admit(SpState *s, const SpChainOracle *o,
         if (!(p.cert.scope & scope)) return fail(err, errlen, "cert lacks scope");
         if (!sp_cert_verify(&p.cert, p.name, p.name_len, p.signer, p.anchor, owner))
             return fail(err, errlen, "delegation cert invalid");
-    } else if (!sp_key_is_owner(p.signer, 33, owner)) {
-        return fail(err, errlen, "signer is not the owner");
     }
 
     // anchor: 1 ⇒ compare against the header we hold (mismatch = stale branch
