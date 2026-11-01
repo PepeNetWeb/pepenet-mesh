@@ -21,14 +21,14 @@ CFLAGS  ?= -std=c11 -D_DEFAULT_SOURCE -O2 -Wall -Wextra -Wshadow
 AR      ?= ar
 
 # Protocol-sm primitives (SHA-256 / RIPEMD-160 / secp_* interface + shim).
-# Live namespace-protocol — not social's (often lagging) submodule pin.
-PROTO   := ../namespace-protocol
+# Monorepo layout: the protocol tree lives under indexer/protocol.
+PROTO   := ../indexer/protocol
 SMDIR   := $(PROTO)/impls/c/src
 SHIMSRC := $(PROTO)/shim/secp_shim.c
 
 # Vendored libsecp256k1 — the indexer owns the build tree the family uses
 # (pepenet-social, its previous home, is retired).
-IDX     := ../namespace-indexer
+IDX     := ../indexer
 SECPDIR := $(IDX)/vendor/secp256k1
 SECPLIB := $(IDX)/build/secp/lib/libsecp256k1.a
 
